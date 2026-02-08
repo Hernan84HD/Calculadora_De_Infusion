@@ -142,26 +142,28 @@
 
         <!-- CONTENEDOR DE RESULTADOS (5 y 6) -->
         <div id="seccionResultados" class="hidden">
-            <!-- 5. MONITOR DE RESULTADOS -->
+            <!-- 5. MONITOR DE RESULTADOS (Altura reducida) -->
             <div class="bg-black rounded-[2rem] p-0 mb-4 text-white shadow-2xl border-b-8 border-green-600 overflow-hidden">
                 <div class="grid grid-cols-2">
-                    <div class="text-center p-5 border-r border-b border-slate-900">
+                    <div class="text-center py-3 px-3 border-r border-b border-slate-900">
                         <p class="text-[9px] font-black text-white uppercase mb-1 tracking-wider">Velocidad</p>
                         <p class="text-2xl font-800 text-white" id="resMlHora">--</p>
                     </div>
 
-                    <div id="quadGoteo" onclick="toggleMetronomo()" class="text-center p-5 border-b border-slate-900 cursor-pointer quad-pulse transition-all active:opacity-80 flex flex-col items-center justify-center">
+                    <div id="quadGoteo" onclick="toggleMetronomo()" class="text-center py-3 px-3 border-b border-slate-900 cursor-pointer quad-pulse transition-all active:opacity-80 flex flex-col items-center justify-center">
                         <p class="text-[9px] font-black text-white uppercase mb-1 tracking-wider">Goteo Manual</p>
-                        <p class="text-2xl font-800 text-white" id="resGoteo">--</p>
-                        <div id="statusIcon" class="mt-2 text-white transition-colors opacity-40"></div>
+                        <div class="flex items-center gap-2">
+                            <p class="text-2xl font-800 text-white" id="resGoteo">--</p>
+                            <div id="statusIcon" class="text-white transition-colors opacity-40"></div>
+                        </div>
                     </div>
 
-                    <div class="text-center p-5 border-r border-slate-900">
+                    <div class="text-center py-3 px-3 border-r border-slate-900">
                         <p class="text-[9px] font-black text-white uppercase mb-1 tracking-wider">Duración</p>
                         <p class="text-2xl font-800 text-emerald-400" id="resDuracion">--</p>
                     </div>
 
-                    <div class="text-center p-5">
+                    <div class="text-center py-3 px-3">
                         <p class="text-[9px] font-black text-white uppercase mb-1 tracking-wider">Retirar Suero</p>
                         <p class="text-2xl font-800 text-rose-400" id="totalRetirar">--</p>
                     </div>
