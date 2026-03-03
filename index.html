@@ -269,154 +269,16 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración de Firebase (proporcionada por el entorno)
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'veterinaria-app';
-        
-        // RUTA ESTRICTA PARA DATOS PÚBLICOS GLOBALES (Regla 1)
-        const collectionPath = `artifacts/${appId}/public/data/vademecum`;
-
-        let vademecumGlobal = [];
-        let currentUser = null;
+        // --- 1. FUNCIONES PRINCIPALES (Movidas arriba para evitar bloqueos) ---
         let drugCount = 0;
         let metroInterval = null;
         let currentSegGtt = 0;
         let audioCtx = null;
+        let vademecumGlobal = [];
+        let currentUser = null;
 
         const iconPlay = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>`;
         const iconStop = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" /></svg>`;
-
-        // Autenticación (Regla 3)
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Error de autenticación:", error);
-                document.getElementById('estadoDB').innerHTML = `<span class="text-rose-500">Error de conexión DB</span>`;
-            }
-        };
-
-        // Escuchar estado de auth y cargar datos
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if (user) {
-                cargarVademecumNube();
-            }
-        });
-
-        initAuth();
-
-        // Función para leer datos en tiempo real de Firebase
-        function cargarVademecumNube() {
-            if (!currentUser) return;
-            
-            const vademecumRef = collection(db, collectionPath);
-            
-            onSnapshot(vademecumRef, (snapshot) => {
-                vademecumGlobal = [];
-                snapshot.forEach((doc) => {
-                    vademecumGlobal.push({ id: doc.id, ...doc.data() });
-                });
-                
-                document.getElementById('estadoDB').innerHTML = `<span class="text-green-500 font-bold">✓ Sincronizado (${vademecumGlobal.length} fármacos)</span>`;
-                document.getElementById('syncIndicator').classList.remove('hidden');
-                setTimeout(() => document.getElementById('syncIndicator').classList.add('hidden'), 2000);
-                
-                // Si el modal está abierto, actualizamos la lista
-                if (!document.getElementById('modalFrecuentes').classList.contains('hidden')) {
-                    renderizarFrecuentes();
-                }
-
-                // Carga inicial por defecto si la base de datos está vacía (opcional, para que no arranques de 0)
-                if (snapshot.empty && vademecumGlobal.length === 0) {
-                    sembrarDatosIniciales();
-                }
-
-            }, (error) => {
-                console.error("Error al leer Firestore:", error);
-                document.getElementById('estadoDB').innerHTML = `<span class="text-rose-500">Error leyendo DB</span>`;
-            });
-        }
-
-        async function sembrarDatosIniciales() {
-            const defaults = [
-                { nombre: "Ampicilina", conc: 100, dosis: 20 },
-                { nombre: "Atropina", conc: 1, dosis: 0.04 },
-                { nombre: "Dexametasona", conc: 4, dosis: 1 },
-                { nombre: "Furosemida", conc: 10, dosis: 2 },
-                { nombre: "Tramadol", conc: 50, dosis: 2 }
-            ];
-            for (const d of defaults) {
-                await addDoc(collection(db, collectionPath), d);
-            }
-        }
-
-        // Renderizar lista en el Modal
-        function renderizarFrecuentes() {
-            const lista = document.getElementById('opcionesFrecuentes');
-            lista.innerHTML = "";
-            
-            vademecumGlobal.sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(f => {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = "flex gap-2 w-full";
-                
-                const btn = document.createElement('button');
-                btn.className = "flex-1 text-left p-3.5 rounded-xl border-2 border-slate-700 hover:border-green-500 font-bold flex justify-between items-center transition-all bg-black text-white text-sm";
-                btn.innerHTML = `<span>${f.nombre}</span> <span class="text-slate-400 text-xs">${f.conc} mg/ml | ${f.dosis} mg/kg</span>`;
-                btn.onclick = () => window.agregarMedicamento(f);
-
-                const delBtn = document.createElement('button');
-                delBtn.className = "w-12 flex items-center justify-center bg-rose-900/30 text-rose-500 rounded-xl border-2 border-slate-700 hover:bg-rose-600 hover:text-white transition-colors";
-                delBtn.innerHTML = "×";
-                delBtn.onclick = () => window.eliminarDeBD(f.id);
-
-                itemDiv.appendChild(btn);
-                itemDiv.appendChild(delBtn);
-                lista.appendChild(itemDiv);
-            });
-        }
-
-        // Guardar nuevo fármaco en Firebase
-        window.guardarNuevoFarmaco = async function() {
-            if (!currentUser) return;
-            const nombre = document.getElementById('nuevoNombre').value;
-            const conc = parseFloat(document.getElementById('nuevoConc').value);
-            const dosis = parseFloat(document.getElementById('nuevoDosis').value);
-
-            if (nombre && conc > 0 && dosis > 0) {
-                try {
-                    await addDoc(collection(db, collectionPath), {
-                        nombre: nombre,
-                        conc: conc,
-                        dosis: dosis
-                    });
-                    window.cerrarModalNuevoFarmaco();
-                    // Limpiar inputs
-                    document.getElementById('nuevoNombre').value = '';
-                    document.getElementById('nuevoConc').value = '';
-                    document.getElementById('nuevoDosis').value = '';
-                } catch(e) {
-                    console.error("Error guardando:", e);
-                }
-            }
-        };
-
-        // Eliminar fármaco de Firebase
-        window.eliminarDeBD = async function(docId) {
-            if (!currentUser) return;
-            try {
-                await deleteDoc(doc(db, collectionPath, docId));
-            } catch(e) { console.error(e); }
-        };
-
-        // --- FUNCIONES ORIGINALES ADAPTADAS AL SCOPE GLOBAL --- //
 
         window.agregarMedicamento = function(preset = null) {
             drugCount++;
@@ -445,7 +307,7 @@
                 </div>
             `;
             container.appendChild(div);
-            if (preset) window.cerrarModalFrecuentes();
+            if (preset && preset.nombre) window.cerrarModalFrecuentes();
             window.calcularTodo();
         };
 
@@ -475,7 +337,6 @@
             document.getElementById('modalNuevoFarmaco').classList.add('hidden');
         };
 
-        // Sonidos y cálculos matemáticos (Sin cambios lógicos)
         async function playBeep() {
             try {
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -583,6 +444,142 @@
         window.onload = () => {
             document.getElementById('statusIcon').innerHTML = iconPlay;
         };
+
+        // --- 2. CONFIGURACIÓN FIREBASE (NUBE) ---
+        // ATENCIÓN HERNÁN: Pega aquí los datos de tu proyecto de Firebase para que funcione en GitHub
+        const miConfiguracionFirebase = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : miConfiguracionFirebase;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'veterinaria-app';
+        const collectionPath = `artifacts/${appId}/public/data/vademecum`;
+
+        let db;
+
+        try {
+            if (!firebaseConfig.apiKey) throw new Error("Faltan credenciales de Firebase");
+            
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            db = getFirestore(app);
+
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Error auth:", error);
+                }
+            };
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) cargarVademecumNube();
+            });
+
+            initAuth();
+        } catch (error) {
+            console.warn("Base de datos desactivada:", error.message);
+            document.getElementById('estadoDB').innerHTML = `<span class="text-rose-500 text-[10px] font-bold">FALTA CONFIGURAR FIREBASE EN EL CÓDIGO</span>`;
+        }
+
+        function cargarVademecumNube() {
+            if (!currentUser || !db) return;
+            const vademecumRef = collection(db, collectionPath);
+            onSnapshot(vademecumRef, (snapshot) => {
+                vademecumGlobal = [];
+                snapshot.forEach((doc) => {
+                    vademecumGlobal.push({ id: doc.id, ...doc.data() });
+                });
+                
+                document.getElementById('estadoDB').innerHTML = `<span class="text-green-500 font-bold">✓ Sincronizado (${vademecumGlobal.length} fármacos)</span>`;
+                document.getElementById('syncIndicator').classList.remove('hidden');
+                setTimeout(() => document.getElementById('syncIndicator').classList.add('hidden'), 2000);
+                
+                if (!document.getElementById('modalFrecuentes').classList.contains('hidden')) {
+                    renderizarFrecuentes();
+                }
+
+                if (snapshot.empty && vademecumGlobal.length === 0) {
+                    sembrarDatosIniciales();
+                }
+            }, (error) => {
+                console.error("Error al leer Firestore:", error);
+            });
+        }
+
+        async function sembrarDatosIniciales() {
+            if (!db) return;
+            const defaults = [
+                { nombre: "Ampicilina", conc: 100, dosis: 20 },
+                { nombre: "Atropina", conc: 1, dosis: 0.04 },
+                { nombre: "Dexametasona", conc: 4, dosis: 1 },
+                { nombre: "Furosemida", conc: 10, dosis: 2 },
+                { nombre: "Tramadol", conc: 50, dosis: 2 }
+            ];
+            for (const d of defaults) {
+                await addDoc(collection(db, collectionPath), d);
+            }
+        }
+
+        function renderizarFrecuentes() {
+            const lista = document.getElementById('opcionesFrecuentes');
+            lista.innerHTML = "";
+            if(vademecumGlobal.length === 0) {
+                 lista.innerHTML = "<p class='text-slate-400 text-xs text-center p-4'>No hay datos. Verifica tu conexión o agrega un fármaco.</p>";
+            }
+            vademecumGlobal.sort((a,b) => a.nombre.localeCompare(b.nombre)).forEach(f => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "flex gap-2 w-full";
+                
+                const btn = document.createElement('button');
+                btn.className = "flex-1 text-left p-3.5 rounded-xl border-2 border-slate-700 hover:border-green-500 font-bold flex justify-between items-center transition-all bg-black text-white text-sm";
+                btn.innerHTML = `<span>${f.nombre}</span> <span class="text-slate-400 text-xs">${f.conc} mg/ml | ${f.dosis} mg/kg</span>`;
+                btn.onclick = () => window.agregarMedicamento(f);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = "w-12 flex items-center justify-center bg-rose-900/30 text-rose-500 rounded-xl border-2 border-slate-700 hover:bg-rose-600 hover:text-white transition-colors";
+                delBtn.innerHTML = "×";
+                delBtn.onclick = () => window.eliminarDeBD(f.id);
+
+                itemDiv.appendChild(btn);
+                itemDiv.appendChild(delBtn);
+                lista.appendChild(itemDiv);
+            });
+        }
+
+        window.guardarNuevoFarmaco = async function() {
+            if (!currentUser || !db) return alert("Firebase no está configurado.");
+            const nombre = document.getElementById('nuevoNombre').value;
+            const conc = parseFloat(document.getElementById('nuevoConc').value);
+            const dosis = parseFloat(document.getElementById('nuevoDosis').value);
+
+            if (nombre && conc > 0 && dosis > 0) {
+                try {
+                    await addDoc(collection(db, collectionPath), { nombre, conc, dosis });
+                    window.cerrarModalNuevoFarmaco();
+                    document.getElementById('nuevoNombre').value = '';
+                    document.getElementById('nuevoConc').value = '';
+                    document.getElementById('nuevoDosis').value = '';
+                } catch(e) { console.error("Error guardando:", e); }
+            }
+        };
+
+        window.eliminarDeBD = async function(docId) {
+            if (!currentUser || !db) return;
+            try { await deleteDoc(doc(db, collectionPath, docId)); } 
+            catch(e) { console.error(e); }
+        };
+
     </script>
 </body>
 </html>
